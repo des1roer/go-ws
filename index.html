@@ -1,0 +1,55 @@
+<button id="sendButton">test</button>
+<label for="messageInput"></label><textarea id="messageInput"></textarea>
+<script>
+    // Функция для создания WebSocket соединения
+    function createWebSocket(url) {
+        const socket = new WebSocket(url);
+
+        // Обработчик открытия соединения
+        socket.onopen = function(event) {
+            console.log('Соединение установлено');
+        };
+
+        // Обработчик получения сообщения от сервера
+        socket.onmessage = function(event) {
+            console.log('Получено сообщение:', event.data);
+            // Здесь вы можете обработать полученное сообщение
+        };
+
+        // Обработчик ошибок
+        socket.onerror = function(error) {
+            console.error('Ошибка:', error);
+        };
+
+        // Обработчик закрытия соединения
+        socket.onclose = function(event) {
+            console.log('Соединение закрыто');
+        };
+
+        return socket;
+    }
+
+    // URL сервера
+    const url = 'ws://localhost:8080/ws';
+
+    // Создание WebSocket соединения
+    const socket = createWebSocket(url);
+
+    // Функция для отправки сообщений на сервер
+    function sendMessage(message) {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify(message));
+            console.log('Сообщение отправлено:', message);
+        } else {
+            console.error('Соединение не установлено');
+        }
+    }
+
+    // Пример использования
+    document.getElementById('sendButton').addEventListener('click', function() {
+        const input = document.getElementById('messageInput');
+        const message = { type: 'chat', content: input.value };
+        sendMessage(message);
+        input.value = '';
+    });
+</script>
