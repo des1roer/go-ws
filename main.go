@@ -5,6 +5,7 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -68,7 +69,7 @@ func handleTextMessage(conn *websocket.Conn, clientId string, message string) {
 
 	// Проверяем наличие клиента в списке соединений
 	if _, ok := clients[clientId]; ok {
-		err := conn.WriteMessage(websocket.TextMessage, []byte(`{"timestamp":`+time.Now().Format(time.RFC3339)+`, "message": "`+message+`"}"`))
+		err := conn.WriteMessage(websocket.TextMessage, []byte(`{"timestamp":`+strconv.FormatInt(time.Now().UTC().UnixNano(), 10)+`, "message": "`+message+`"}`))
 		if err != nil {
 			log.Println(err)
 			delete(clients, clientId)

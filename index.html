@@ -20,6 +20,13 @@
 
             this.socket.onmessage = (event) => {
                 console.log('Получено сообщение:', event.data);
+                const data = JSON.parse(event.data);
+
+                const message = data.message;
+                if (message === 'HI') {
+                    alert('hi');
+                }
+
                 // Здесь вы можете обработать полученное сообщение
             };
 
