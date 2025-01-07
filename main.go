@@ -1,12 +1,24 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
+type Message struct {
+	Content string `json:"content"`
+}
+
+type ClientMessage struct {
+	ClientId string  `json:"clientId"`
+	Message  Message `json:"message"`
+}
+
+var clients = make(map[string]*websocket.Conn)
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true // Позволяет всем запросам установить соединение
@@ -30,6 +42,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		messageType, p, err := conn.ReadMessage()
 		if err != nil {
 			log.Println(err)
+			delete(clients, conn.RemoteAddr().String())
 			break
 		}
 
@@ -37,7 +50,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		case websocket.TextMessage:
 			handleTextMessage(conn, string(p))
 		case websocket.PongMessage:
-		// Обработка PONG сообщений
+			// Обработка PONG сообщений
 		default:
 			log.Printf("Unknown message type: %d", messageType)
 		}
@@ -45,10 +58,15 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleTextMessage(conn *websocket.Conn, message string) {
-	// Здесь можно добавить логику обработки входящих сообщений
-	log.Printf("Received message: %s", message)
-	// Отправка ответного сообщения
-	err := conn.WriteMessage(websocket.TextMessage, []byte("Server received your message"))
+	var cm ClientMessage
+	err := json.Unmarshal([]byte(message), &cm)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Printf("Received message from client %s: %s", conn.RemoteAddr(), message)
+	err = conn.WriteMessage(websocket.TextMessage, []byte(`{"timestamp":`+time.Now().Format(time.RFC3339)+`, "message": "`+message+`", "ClientId": "`+cm.ClientId+`"}`))
 	if err != nil {
 		log.Println(err)
 	}

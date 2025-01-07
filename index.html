@@ -1,55 +1,81 @@
 <button id="sendButton">test</button>
 <label for="messageInput"></label><textarea id="messageInput"></textarea>
 <script>
-    // Функция для создания WebSocket соединения
-    function createWebSocket(url) {
-        const socket = new WebSocket(url);
+    class WebSocketClient {
+        constructor(url) {
+            this.url = url;
+            this.socket = null;
+            this.clientId = null;
 
-        // Обработчик открытия соединения
-        socket.onopen = function(event) {
-            console.log('Соединение установлено');
-        };
+            this.connect();
+        }
 
-        // Обработчик получения сообщения от сервера
-        socket.onmessage = function(event) {
-            console.log('Получено сообщение:', event.data);
-            // Здесь вы можете обработать полученное сообщение
-        };
+        connect() {
+            this.socket = new WebSocket(this.url);
 
-        // Обработчик ошибок
-        socket.onerror = function(error) {
-            console.error('Ошибка:', error);
-        };
+            this.socket.onopen = () => {
+                console.log('Соединение установлено');
+                this.generateClientId();
+            };
 
-        // Обработчик закрытия соединения
-        socket.onclose = function(event) {
-            console.log('Соединение закрыто');
-        };
+            this.socket.onmessage = (event) => {
+                console.log('Получено сообщение:', event.data);
+                // Здесь вы можете обработать полученное сообщение
+            };
 
-        return socket;
-    }
+            this.socket.onerror = (error) => {
+                console.error('Ошибка:', error);
+            };
 
-    // URL сервера
-    const url = 'ws://localhost:8080/ws';
+            this.socket.onclose = () => {
+                console.log('Соединение закрыто');
+            };
+        }
 
-    // Создание WebSocket соединения
-    const socket = createWebSocket(url);
+        generateClientId() {
+            // Генерируем clientId на основе IP-адреса и случайной строки
+            const ip = this.getIpAddress();
+            const randomString = this.generateRandomString(8);
+            this.clientId = `${ip}:${randomString}`;
+        }
 
-    // Функция для отправки сообщений на сервер
-    function sendMessage(message) {
-        if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify(message));
-            console.log('Сообщение отправлено:', message);
-        } else {
-            console.error('Соединение не установлено');
+        getIpAddress() {
+            // Простое получение IP-адреса клиента
+            return window.location.hostname;
+        }
+
+        generateRandomString(length) {
+            const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += charset.charAt(Math.floor(Math.random() * charset.length));
+            }
+            return result;
+        }
+
+        sendMessage(message) {
+            if (this.socket.readyState === WebSocket.OPEN && this.clientId) {
+                this.socket.send(JSON.stringify({ clientId: this.clientId, message }));
+                console.log('Сообщение отправлено:', { clientId: this.clientId, message });
+            } else {
+                console.error('Не удалось отправить сообщение');
+            }
+        }
+
+        disconnect() {
+            if (this.socket) {
+                this.socket.close();
+                this.socket = null;
+            }
         }
     }
 
-    // Пример использования
+    const url = 'ws://localhost:8080/ws';
+    const client = new WebSocketClient(url);
+
     document.getElementById('sendButton').addEventListener('click', function() {
         const input = document.getElementById('messageInput');
-        const message = { type: 'chat', content: input.value };
-        sendMessage(message);
+        client.sendMessage({ content: input.value });
         input.value = '';
     });
 </script>
