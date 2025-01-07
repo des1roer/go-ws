@@ -34,14 +34,8 @@
 
         generateClientId() {
             // Генерируем clientId на основе IP-адреса и случайной строки
-            const ip = this.getIpAddress();
             const randomString = this.generateRandomString(8);
-            this.clientId = `${ip}:${randomString}`;
-        }
-
-        getIpAddress() {
-            // Простое получение IP-адреса клиента
-            return window.location.hostname;
+            this.clientId = `${randomString}`;
         }
 
         generateRandomString(length) {

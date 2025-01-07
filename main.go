@@ -2,11 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 type Message struct {
@@ -48,7 +47,14 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 		switch messageType {
 		case websocket.TextMessage:
-			handleTextMessage(conn, string(p))
+			var cm ClientMessage
+			err := json.Unmarshal(p, &cm)
+			if err == nil {
+				clients[cm.ClientId] = conn
+				handleTextMessage(conn, cm.ClientId, cm.Message.Content)
+			} else {
+				log.Printf("Error unmarshaling message from client %s", conn.RemoteAddr())
+			}
 		case websocket.PongMessage:
 			// Обработка PONG сообщений
 		default:
@@ -57,22 +63,52 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleTextMessage(conn *websocket.Conn, message string) {
-	var cm ClientMessage
-	err := json.Unmarshal([]byte(message), &cm)
-	if err != nil {
-		log.Println(err)
+func handleTextMessage(conn *websocket.Conn, clientId string, message string) {
+	log.Printf("Received message from client %s: %s", clientId, message)
+
+	// Проверяем наличие клиента в списке соединений
+	if _, ok := clients[clientId]; ok {
+		err := conn.WriteMessage(websocket.TextMessage, []byte(`{"timestamp":`+time.Now().Format(time.RFC3339)+`, "message": "`+message+`"}"`))
+		if err != nil {
+			log.Println(err)
+			delete(clients, clientId)
+		}
+
+		log.Printf("Sent hello message to client %s", clientId)
+	} else {
+		log.Printf("Client %s not found in connections", clientId)
+	}
+}
+
+func getApiClientStatus(w http.ResponseWriter, r *http.Request) {
+	clientId := r.URL.Query().Get("clientId")
+
+	if clientId == "" {
+		http.Error(w, "Missing clientId parameter", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("Received message from client %s: %s", conn.RemoteAddr(), message)
-	err = conn.WriteMessage(websocket.TextMessage, []byte(`{"timestamp":`+time.Now().Format(time.RFC3339)+`, "message": "`+message+`", "ClientId": "`+cm.ClientId+`"}`))
-	if err != nil {
-		log.Println(err)
+	if _, ok := clients[clientId]; ok {
+		w.WriteHeader(http.StatusOK)
+		handleTextMessage(clients[clientId], clientId, `HI`)
+		_, err := w.Write([]byte(`{"status":"connected"}`))
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+		_, err := w.Write([]byte(`{"status":"not connected"}`))
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
 }
 
 func main() {
 	http.HandleFunc("/ws", handleWebSocket)
+	http.HandleFunc("/api/status", getApiClientStatus)
+
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
